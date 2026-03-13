@@ -3,110 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>國中理化化合物練習</title>
+    <title>理化競速挑戰</title>
     <style>
-        :root { --primary-color: #007aff; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f2f2f7; margin: 0; padding: 20px; color: #1c1c1e; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 500px; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         
-        /* 標題與返回鍵 */
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .back-btn { font-size: 14px; padding: 8px 15px; background: #e5e5ea; border-radius: 10px; cursor: pointer; border: none; }
-        
-        /* 按鈕樣式：解決 Safari 爆框與字體小 */
-        .btn { 
-            display: flex; align-items: center; justify-content: center; width: 100%; 
-            min-height: 60px; margin: 12px 0; padding: 10px 15px;
-            font-size: 18px; font-weight: 500; color: var(--primary-color);
-            background: #f0f7ff; border: 2px solid var(--primary-color); border-radius: 12px;
-            cursor: pointer; transition: 0.2s; line-height: 1.3;
-        }
-        .btn:active { background: var(--primary-color); color: white; }
-        
-        /* 管理員區塊：清空鍵與輸入框 */
-        .admin-box { display: flex; gap: 8px; margin-top: 40px; border-top: 1px solid #ddd; padding-top: 20px; }
-        .admin-box input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
-        .clear-btn { padding: 10px 15px; background: #ff3b30; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+        /* 分數與計時器顯示 */
+        .status-bar { display: flex; justify-content: space-between; background: #e9ecef; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; }
+        .score-val { color: #28a745; }
+        .timer-val { color: #dc3545; }
 
-        h3 { margin-top: 0; }
-        #question-text { font-size: 20px; margin-bottom: 20px; font-weight: bold; }
+        .btn { 
+            display: block; width: 100%; min-height: 60px; margin: 12px 0; padding: 10px;
+            font-size: 18px; color: #007aff; background: #fff; border: 2px solid #007aff; border-radius: 12px; cursor: pointer;
+        }
+        .btn:active { background: #007aff; color: #fff; }
+        
+        #question-text { font-size: 20px; font-weight: bold; margin: 20px 0; min-height: 50px; text-align: center; }
+        
+        /* 榮譽榜樣式 */
+        .rank-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; }
+        .rank-name { font-weight: bold; }
+        
+        .feedback { text-align: center; font-weight: bold; padding: 15px; border-radius: 10px; margin-top: 10px; display: none; }
+        .wrong { background: #ffebeb; color: #d93025; }
+        
+        .admin-zone { margin-top: 30px; border-top: 2px dashed #ddd; padding-top: 15px; display: flex; gap: 5px; }
+        .admin-zone input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h3 id="main-title">理化化合物練習</h3>
-            <button class="back-btn" onclick="showMenu()">返回主選單</button>
+            <h3 id="title">載入中...</h3>
+            <button onclick="showMenu()" style="padding: 5px 10px; border-radius: 5px; border: none; background: #ddd;">返回</button>
+        </div>
+
+        <div id="game-info" class="status-bar" style="display:none;">
+            <span>得分: <span id="current-score" class="score-val">0</span></span>
+            <span>本題剩餘: <span id="temp-score" class="timer-val">100</span></span>
         </div>
         
-        <div id="display-area">
-            </div>
+        <div id="main-area"></div>
+        <div id="feedback-box" class="feedback"></div>
 
-        <div class="admin-box">
-            <input type="password" id="pwdInput" placeholder="輸入密碼清空數據">
-            <button class="clear-btn" onclick="handleClear()">清空榮譽榜</button>
+        <div id="admin-area" class="admin-zone">
+            <input type="password" id="adminPwd" placeholder="管理密碼">
+            <button onclick="clearRank()" style="background:#ff3b30; color:white; border:none; border-radius:5px; padding:8px 12px;">清空榮譽榜</button>
         </div>
     </div>
 
     <script src="./data.js"></script>
     <script>
-        const display = document.getElementById('display-area');
-        
-        // 顯示主選單 (自動抓取 data.js 的關卡)
+        let totalScore = 0;
+        let tempScore = 100;
+        let timerId = null;
+        let startTime = 0;
+        let currentLv = 0;
+
+        const mainArea = document.getElementById('main-area');
+        const feedback = document.getElementById('feedback-box');
+        const infoBar = document.getElementById('game-info');
+
+        // 1. 顯示主選單與榮譽榜
         function showMenu() {
-            document.getElementById('main-title').innerText = "理化練習系統";
-            let html = '<p>請選擇練習關卡：</p>';
-            gameData.forEach((level, index) => {
-                html += `<button class="btn" onclick="startLevel(${index})">${level.levelName}</button>`;
+            clearInterval(timerId);
+            infoBar.style.display = "none";
+            feedback.style.display = "none";
+            document.getElementById('title').innerText = "理化挑戰選單";
+            
+            let html = "<h4>選擇關卡</h4>";
+            gameData.forEach((lv, i) => {
+                html += `<button class="btn" onclick="startLevel(${i})">${lv.levelName}</button>`;
             });
-            display.innerHTML = html;
+
+            // 顯示榮譽榜
+            const rankData = JSON.parse(localStorage.getItem('chemRank') || "[]");
+            html += "<h4 style='margin-top:20px;'>🏆 榮譽榜 (前五名)</h4>";
+            if(rankData.length === 0) {
+                html += "<p style='color:gray; text-align:center;'>暫無紀錄</p>";
+            } else {
+                rankData.sort((a,b) => b.score - a.score).slice(0, 5).forEach((item, idx) => {
+                    html += `<div class="rank-item"><span>${idx+1}. ${item.name}</span><span>${item.score} 分</span></div>`;
+                });
+            }
+            mainArea.innerHTML = html;
         }
 
-        // 開始關卡
-        function startLevel(index) {
-            const level = gameData[index];
-            document.getElementById('main-title').innerText = level.levelName;
-            showQuestion(index, 0);
+        // 2. 開始關卡
+        function startLevel(idx) {
+            currentLv = idx;
+            totalScore = 0;
+            document.getElementById('current-score').innerText = "0";
+            infoBar.style.display = "flex";
+            showQuestion(idx, 0);
         }
 
-        // 顯示題目
+        // 3. 顯示題目與啟動計分計時器
         function showQuestion(lvIdx, qIdx) {
+            clearInterval(timerId);
+            feedback.style.display = "none";
             const q = gameData[lvIdx].questions[qIdx];
+
             if (!q) {
-                display.innerHTML = "<h4>恭喜完成本關！</h4><button class='btn' onclick='showMenu()'>回主選單</button>";
+                finishGame();
                 return;
             }
+
+            document.getElementById('title').innerText = gameData[lvIdx].levelName;
+            tempScore = 100;
+            document.getElementById('temp-score').innerText = "100";
             
-            let html = `<div id="question-text">${q.q}</div>`;
-            q.options.forEach((opt, i) => {
-                html += `<button class="btn" onclick="checkAns(${lvIdx}, ${qIdx}, ${i})">${opt}</button>`;
-            });
-            display.innerHTML = html;
+            // 計分邏輯：1.5秒後每秒扣10分
+            startTime = Date.now();
+            timerId = setInterval(() => {
+                let elapsed = (Date.now() - startTime) / 1000;
+                if (elapsed > 1.5) {
+                    tempScore = 100 - Math.floor(elapsed - 1.5) * 10;
+                    if (tempScore < 0) tempScore = 0;
+                    document.getElementById('temp-score').innerText = tempScore;
+                }
+            }, 100);
+
+            let optionsHtml = q.options.map((opt, i) => 
+                `<button class="btn" onclick="check(${lvIdx}, ${qIdx}, ${i})">${opt}</button>`
+            ).join('');
+
+            mainArea.innerHTML = `<div id="question-text">${q.q}</div>${optionsHtml}`;
         }
 
-        // 檢查答案
-        function checkAns(lvIdx, qIdx, userAns) {
-            if (userAns === gameData[lvIdx].questions[qIdx].a) {
-                alert("答對了！");
+        // 4. 檢查答案
+        function check(lvIdx, qIdx, userAns) {
+            clearInterval(timerId);
+            const q = gameData[lvIdx].questions[qIdx];
+            
+            if (userAns === q.a) {
+                totalScore += tempScore;
+                document.getElementById('current-score').innerText = totalScore;
                 showQuestion(lvIdx, qIdx + 1);
             } else {
-                alert("再試一次看看！");
+                feedback.innerText = "答錯！正確答案是：" + q.options[q.a];
+                feedback.className = "feedback wrong";
+                feedback.style.display = "block";
+                setTimeout(() => showQuestion(lvIdx, qIdx + 1), 1500);
             }
         }
 
-        // 處理密碼 9306696
-        function handleClear() {
-            const pwd = document.getElementById('pwdInput').value;
-            if (pwd === "9306696") {
-                alert("數據已清空 (此為模擬動作)");
-                document.getElementById('pwdInput').value = "";
+        // 5. 結束並存入榮譽榜
+        function finishGame() {
+            infoBar.style.display = "none";
+            const name = prompt("挑戰結束！你的總分是：" + totalScore + "\n請輸入你的大名：") || "無名氏";
+            
+            let rankData = JSON.parse(localStorage.getItem('chemRank') || "[]");
+            rankData.push({ name: name, score: totalScore, date: new Date().toLocaleDateString() });
+            localStorage.setItem('chemRank', JSON.stringify(rankData));
+            
+            showMenu();
+        }
+
+        // 6. 管理功能：清空紀錄
+        function clearRank() {
+            if (document.getElementById('adminPwd').value === "9306696") {
+                localStorage.removeItem('chemRank');
+                alert("榮譽榜已清空！");
+                showMenu();
             } else {
-                alert("密碼不正確");
+                alert("密碼錯誤！");
             }
         }
 
-        // 初始化
-        showMenu();
+        window.onload = showMenu;
     </script>
 </body>
 </html>
